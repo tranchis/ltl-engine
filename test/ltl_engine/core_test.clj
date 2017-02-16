@@ -50,7 +50,8 @@
           [:O [:A "a" "b"] [:A "c" "d"]])
     (fact (tree->tree [:S [:I [:S [:T "a"]] [:S [:T "b"]]]]) => [:O [:N "a"] "b"])
     (fact (tree->tree [:S [:F [:S [:T "a"]]]]) => [:U :TRUE "a"])
-    (fact (tree->tree [:S [:G [:S [:T "a"]]]]) => [:R :FALSE "a"])))
+    (fact (tree->tree [:S [:G [:S [:T "a"]]]]) => [:R :FALSE "a"])
+    (fact (tree->tree [:S [:N [:S [:G [:S [:T "a"]]]]]]) => [:U :TRUE [:N "a"]])))
 
 (deftest negate-test
   (fact (negate [:TRUE]) => [:FALSE])

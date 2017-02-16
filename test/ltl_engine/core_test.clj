@@ -96,10 +96,16 @@
   (fact (check-ors #{[:O "a" "b"] "a" "b"} #{"b"} "d") => true))
 
 (deftest cs-test
-  (fact (cs '()) => '())
-  (fact (cs [[:TRUE] [:FALSE] [:A "a" "b"]
-             [:N [:A "a" "b"]] "a" [:N "a"] "b" [:N "b"]]) =>
-        '(([:TRUE] [:A "a" "b"] "a" "b") ([:TRUE] [:N [:A "a" "b"]] "a" "b")
-          ([:TRUE] [:N [:A "a" "b"]] "a" [:N "b"])
-          ([:TRUE] [:N [:A "a" "b"]] [:N "a"] "b")
-          ([:TRUE] [:N [:A "a" "b"]] [:N "a"] [:N "b"]))))
+  (fact (cs #{}) => '())
+  (fact (into '() (cs #{[:TRUE] [:FALSE] [:O "a" "b"]
+                        [:N [:O "a" "b"]] "a" [:N "a"] "b" [:N "b"]})) =>
+        '(([:N "b"] [:N "a"] [:N [:O "a" "b"]] [:TRUE])
+          ([:O "a" "b"] "a" "b" [:TRUE])
+          ([:N "b"] [:O "a" "b"] "a" [:TRUE])
+          ([:O "a" "b"] [:N "a"] "b" [:TRUE])))
+  (fact (into '() (cs #{[:TRUE] [:FALSE] [:A "a" "b"]
+                        [:N [:A "a" "b"]] "a" [:N "a"] "b" [:N "b"]})) =>
+        '(([:N "b"] "a" [:N [:A "a" "b"]] [:TRUE])
+          ([:N "b"] [:N "a"] [:N [:A "a" "b"]] [:TRUE])
+          ([:N "a"] [:N [:A "a" "b"]] "b" [:TRUE])
+          ([:A "a" "b"] "a" "b" [:TRUE]))))

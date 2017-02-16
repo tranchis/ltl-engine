@@ -23,6 +23,8 @@
 
 (defn parse-ltl [s] (insta/parse ltl-parser s))
 
+(declare tree->tree)
+
 (defmulti neg-tree->tree first)
 (defmethod neg-tree->tree nil [_] (throw (UnsupportedOperationException.)))
 (defmethod neg-tree->tree :N [[_ n]] (tree->tree n))
@@ -101,8 +103,8 @@
          fulfills-reverse-and? fulfills-reverse-or?)))
 
 (defn cs [cl-set]
-  (let [perms (combo/subsets cl-set)]
-    (filter #(is-maximal? cl-set %) perms)))
+  (let [perms (combo/subsets (into [] cl-set))]
+    (into #{} (filter #(is-maximal? cl-set %) perms))))
 
 #_(defn automata-1 [ltl]
   )

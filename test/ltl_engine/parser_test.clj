@@ -1,6 +1,7 @@
 (ns ltl-engine.parser-test
-  (:require [ltl-engine.parser :as sut]
-            [midje.sweet :as midje]))
+  (:require [clojure.test :refer :all]
+            [ltl-engine.parser :refer :all]
+            [midje.sweet :refer :all]))
 
 (deftest ltl-parser-test
   (testing "Valid conversions"
@@ -27,7 +28,12 @@
           [:S [:S [:O [:S [:S [:A [:S [:T "a"]]
                                [:S [:TRUE]]]]]
                    [:S [:S [:A [:S [:FALSE]]
-                            [:S [:T "d"]]]]]]]]))
+                            [:S [:T "d"]]]]]]]])
+    (fact (parse-ltl "GLOBALLY ((NOT p) IMPLIES (NEXT p))") =>
+          [:S [:G [:S [:S [:I [:S [:S [:N [:S [:T "p"]]]]]
+                           [:S [:S [:X [:S [:T "p"]]]]]]]]]])
+    (fact (parse-ltl "GLOBALLY (NOT p)") =>
+          [:S [:G [:S [:S [:N [:S [:T "p"]]]]]]]))
   (testing "Invalid conversions"
     (fact (class (parse-ltl "X a")) => instaparse.gll.Failure)))
 
@@ -48,7 +54,17 @@
                                         [:S [:T "d"]]]]]]]]) =>
           [:O [:A "a" "b"] [:A "c" "d"]])
     (fact (tree->tree [:S [:I [:S [:T "a"]] [:S [:T "b"]]]]) => [:O [:N "a"] "b"])
-    (fact (tree->tree [:S [:F [:S [:T "a"]]]]) => [:U :TRUE "a"])
-    (fact (tree->tree [:S [:G [:S [:T "a"]]]]) => [:R :FALSE "a"])
-    (fact (tree->tree [:S [:N [:S [:G [:S [:T "a"]]]]]]) => [:U :TRUE [:N "a"]])))
+    (fact (tree->tree [:S [:F [:S [:T "a"]]]]) => [:U [:TRUE] "a"])
+    (fact (tree->tree [:S [:G [:S [:T "a"]]]]) => [:R [:FALSE] "a"])
+    (fact (tree->tree [:S [:N [:S [:G [:S [:T "a"]]]]]]) => [:U [:TRUE] [:N "a"]])
+    (fact (tree->tree [:S [:S [:I [:S [:S [:N [:S [:T "p"]]]]]
+                               [:S [:S [:X [:S [:T "p"]]]]]]]]) =>
+          [:O "p" [:X "p"]])
+    (fact (tree->tree [:S [:G [:S [:S [:I [:S [:S [:N [:S [:T "p"]]]]]
+                                       [:S [:S [:X [:S [:T "p"]]]]]]]]]])
+          => [:R [:FALSE] [:O "p" [:X "p"]]])))
 
+(deftest neg-tree->tree-test
+  (fact (neg-tree->tree [:N [:S [:T "a"]]]) => "a")
+  (fact (tree->tree [:N [:S [:TRUE]]]) => [:FALSE])
+  (fact (neg-tree->tree [:N [:S [:TRUE]]]) => [:TRUE]))

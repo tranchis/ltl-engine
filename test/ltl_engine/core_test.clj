@@ -76,7 +76,10 @@
   (fact (fulfills-release? #{[:R "a" "b"] [:A "c" "b"]} #{}) => false)
   (fact (fulfills-release? #{[:R "a" "b"] "b"} #{}) => false)
   (fact (fulfills-release? #{[:R "a" "b"] "b"} #{}) => false)
-  (fact (fulfills-release? #{[:R "a" "b"] "b"} #{[:R "a" "b"]}) => true))
+  (fact (fulfills-release? #{[:R "a" "b"] "b"} #{[:R "a" "b"]}) => true)
+  (fact (fulfills-release? #{[:R [:FALSE] "p"] "p" [:TRUE]}
+                           #{[:R [:FALSE] "p"] "p" [:TRUE]})
+        => true))
 
 (deftest valid-trans-test
   (fact (valid-trans? #{"a" "b" "c"}
@@ -102,7 +105,11 @@
   (fact (valid-trans? #{"a" "b"}
                       {:m #{[:X "a"]}
                        :a #{"a"}
-                       :m-prima #{"a"}}) => true))
+                       :m-prima #{"a"}}) => true)
+  (fact (valid-trans? #{"p"}
+                      {:m #{[:R [:FALSE] "p"] [:TRUE] "p"}
+                       :a #{"p"}
+                       :m-prima #{[:R [:FALSE] "p"] [:TRUE] "p"}}) => true))
 
 (deftest automata-1-test
   (fact (automata-1 [:A "a" "b"]) => (contains

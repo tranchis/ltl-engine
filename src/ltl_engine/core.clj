@@ -1,5 +1,6 @@
 (ns ltl-engine.core
-  (:require [clojure.set :as set]
+  (:require [ltl-engine.parser :as parser]
+            [clojure.set :as set]
             [clojure.math.combinatorics :as combo]))
 
 (defmulti cl first)
@@ -14,7 +15,7 @@
 
 (defn cl [ltl]
   (when-not (= [] ltl)
-    (if (string? ltl)
+    (if (or (string? ltl) (and (= (first ltl) :N) (string? (second ltl))))
       #{ltl (negate ltl)}
       (let [[k & ss] ltl]
         (apply set/union #{ltl (negate ltl)} (map cl ss))))))
@@ -29,6 +30,10 @@
                                         (= (nth % 2) f)))
                               cl-set))]
     (= all-ors (set/intersection all-ors m))))
+
+(defn proposition? [formula]
+  (or (string? formula) (= [:TRUE] formula) (= [:FALSE] formula)
+      (and (= :N (first formula)) (string? (second formula)))))
 
 (defn is-maximal? [cl-set c]
   (let [m (into #{} c)
@@ -58,7 +63,7 @@
          fulfills-reverse-and? fulfills-reverse-or?)))
 
 (defn cs [cl-set]
-  (let [perms (combo/subsets (into [] cl-set))]
+  (let [perms (map #(into #{} %) (combo/subsets (into [] cl-set)))]
     (into #{} (filter #(is-maximal? cl-set %) perms))))
 
 (defn positives [ap-s m]
@@ -83,11 +88,16 @@
                            0))
                       (remove #(= :U (first %)) m)))
         right-2
-        true #_(reduce
-                r-and true
-                (map #(and (contains? m (second %))
-                           (contains? m %))
-                     (filter #(= :U (first %)) m-prima)))
+        (reduce
+         r-and true
+         (map #(let [r (second %)]
+                 (and
+                  (not (contains? m (nth r 2)))
+                  (not (and (contains? m (second r))
+                            (contains? m-prima r)))))
+              (filter #(and (= :N (first %))
+                            (= :U (first (second %))))
+                      m)))
         left (reduce
               r-and true
               (map #(or (contains? m (nth % 2))
@@ -105,11 +115,16 @@
                                                 m))
                                  0)
                              (remove #(= :U (first %)) m)))
-        right-2 true #_(reduce
-                        r-and true
-                        (map #(and (contains? m (second %))
-                                   (contains? m %))
-                             (filter #(= :U (first %)) m-prima)))
+        right-2 (reduce
+                 r-and true
+                 (map #(let [r (second %)]
+                         (and
+                          (not (contains? m [:A (second r) (nth r 2)]))
+                          (not (and (contains? m (nth r 2))
+                                    (contains? m-prima r)))))
+                      (filter #(and (= :N (first %))
+                                    (= :R (first (second %))))
+                              m)))
         left (reduce
               r-and true
               (map #(or (contains? m [:A (second %) (nth % 2)])
@@ -139,6 +154,7 @@
         ap-s (into #{} ap)
         ap-2 (combo/subsets ap)
         m-s (mapcat #(vector % (reverse %)) (combo/combinations cs-s 2))
+        m-s (concat m-s (map #(vector % %) cs-s))
         mam-s (map #(hash-map :m (into #{} (first (first %)))
                               :a (into #{} (second %))
                               :m-prima (into #{} (second (first %))))
@@ -162,31 +178,35 @@
                               (subset-ap? ap-s (:m-prima %) (:a %))) mam-s)]
     valid-trans))
 
-(defn f-set [ltl]
-  (let [cl-s (cl-f ltl)
-        cs-s (cs cl-s)]
-    (into #{}
-          (map
-           #(into #{} (filter (fn [m-s]
-                                (or
-                                 (contains? m-s (nth % 2))
-                                 (contains? m-s [:N %])))
-                              (map (fn [x] (into #{} x)) cs-s)))
-           (filter #(= :U (first %)) cl-s)))))
+(defn f-set [cl-s cs-s]
+  (let [us (filter #(= :U (first %)) cl-s)]
+    (if (> (count us) 0)
+      (into []
+            (map
+             #(into #{} (filter (fn [m-s]
+                                  (or
+                                   (contains? m-s (nth % 2))
+                                   (not (contains? m-s %))))
+                                (map (fn [x] (into #{} x)) cs-s)))
+             us))
+      [cs-s])))
 
 (defn gba [ltl]
   (let [cl-s (cl-f ltl)
         cs-s (cs cl-s)
         a1 (automata-1 ltl)
-        a2 (automata-2 ltl)
+        #_#_a2 (automata-2 ltl)
         ap (filter string? cl-s)
         ap-s (into #{} ap)
-        ap-2 (combo/subsets ap)]
-    {:state-space (set/union #{ltl} cs-s)
-     :propositions ap-2
-     :transitions (into #{} (set/union a1 a2))
-     :states #{ltl}
-     :f (f-set ltl)}))
+        ap-2 (combo/subsets ap)
+        q-0 (into #{} (filter #(contains? % ltl) cs-s))]
+    {:sigma ap-2
+     :q cs-s
+     :q-0 q-0
+     :states q-0
+     :run []
+     :delta a1 #_(into #{} (set/union a1 a2))
+     :f (f-set cl-s cs-s)}))
 
 (defn transitions [gba propositions]
   (let [states (:states gba)
@@ -197,13 +217,26 @@
                              (fn [x]
                                (and (= (:m x) %)
                                     (= (:a x) p-s)))
-                             (:transitions gba))
+                             (:delta gba))
                            states))]
     transitions))
 
 (defn advance [gba propositions]
-  (let [destinations (map :m-prima (transitions gba propositions))]
-    (assoc gba :states (into #{} destinations))))
+  (let [destinations (map :m-prima (transitions gba propositions))
+        destinations-s (into #{} destinations)]
+    (assoc (update-in gba [:run] conj destinations-s)
+           :states destinations-s)))
 
-#_(let [g (gba [:U "a" "b"])]
-  (advance (advance (advance g ["a"]) ["b"]) []))
+#_(let [g (gba (parser/tree->tree (parser/parse-ltl "GLOBALLY ((NOT p) IMPLIES (NEXT p))")))]
+  (advance (advance (advance (advance g ["p"]) []) []) ["p"]))
+
+(let [g (gba (parser/tree->tree (parser/parse-ltl "GLOBALLY ((NOT p) IMPLIES (NEXT p))")))]
+  (advance g ["p"]))
+
+(let [g (gba (parser/tree->tree (parser/parse-ltl "a UNTIL b")))]
+  (advance (advance (advance (advance (advance (advance g ["a"]) ["a"]) ["a"]) []) []) []))
+
+#_(let [g (gba (parser/tree->tree (parser/parse-ltl "a UNTIL (b UNTIL a)")))]
+    (let [gg (advance (advance (advance (advance g ["a"]) ["b"]) ["a"]) [])
+          states (:states gg)]
+      (map #(map (fn [x] (contains? x %)) (:f gg)) states)))
